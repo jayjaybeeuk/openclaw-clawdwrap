@@ -87,11 +87,11 @@ services:
   # --- Secrets boundary / CLI proxy (claw-wrap daemon) ---
   clawwrapd:
     image: openclaw/clawwrapd:local
-    user: "1000:1000"
     build:
       context: .
       dockerfile: Dockerfile.openclaw-tools
-    command: [ "claw-wrap", "daemon", "--uid", "1000" ]
+    user: "0:0"
+    command: [ "/usr/local/bin/start-clawwrapd" ]
     volumes:
       # You provide this file next to the compose
       - ./wrappers.yml:/etc/openclaw/wrappers.yaml:ro

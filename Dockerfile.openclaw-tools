@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --reinstall \
   curl \
   git \
   gnupg \
+  gosu \
   && rm -rf /var/lib/apt/lists/*
 
 # --- 2) Install GitHub CLI (gh) from GitHub's official apt repo ---
@@ -94,6 +95,14 @@ RUN set -eux; \
     'if [ -n "${PINCHTAB_TOKEN:-}" ]; then export PINCHTAB_TOKEN; fi' \
     'exec /usr/local/bin/pinchtab "$@"' >/usr/local/bin/pinch; \
   chmod 0755 /usr/local/bin/pinch
+
+RUN set -eux; \
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'set -euo pipefail' \
+    'install -d -m 0700 -o 1000 -g 1000 /run/openclaw' \
+    'exec gosu 1000:1000 claw-wrap daemon --uid 1000 "$@"' \
+    >/usr/local/bin/start-clawwrapd; \
+  chmod 0755 /usr/local/bin/start-clawwrapd
 
 # Optional: strongly encourage bash for tool execution
 ENV SHELL=/bin/bash
