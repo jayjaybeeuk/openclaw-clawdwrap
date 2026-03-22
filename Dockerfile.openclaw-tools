@@ -1,0 +1,106 @@
+# syntax=docker/dockerfile:1.6
+FROM golang:1.24-bookworm AS clawwrap-builder
+
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends git ca-certificates; \
+  rm -rf /var/lib/apt/lists/*; \
+  git clone https://github.com/dedene/claw-wrap /src/claw-wrap; \
+  cd /src/claw-wrap; \
+  go build -o /usr/local/bin/claw-wrap ./cmd/claw-wrap
+
+FROM pinchtab/pinchtab:latest AS pinchtab-cli
+
+FROM node:22-bookworm
+
+USER root
+
+# --- 1) Base tooling + bash (fixes 'set -o pipefail' issues when sh isn't bash) ---
+RUN apt-get update && apt-get install -y --no-install-recommends --reinstall \
+  bash \
+  ca-certificates \
+  curl \
+  git \
+  gnupg \
+  && rm -rf /var/lib/apt/lists/*
+
+# --- 2) Install GitHub CLI (gh) from GitHub's official apt repo ---
+# This follows the standard "add keyring + add repo + apt install gh" approach.
+RUN set -eux; \
+  install -m 0755 -d /etc/apt/keyrings; \
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  -o /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+  chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  > /etc/apt/sources.list.d/github-cli.list; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends --reinstall gh; \
+  rm -rf /var/lib/apt/lists/*
+
+# --- 3) Install claw-wrap wrapper (build from source to avoid GHCR pulls) ---
+# Built in a Go 1.24 stage to match claw-wrap's module requirements.
+COPY --from=clawwrap-builder /usr/local/bin/claw-wrap /usr/local/bin/claw-wrap
+COPY --from=pinchtab-cli /usr/local/bin/pinchtab /usr/local/bin/pinchtab
+COPY scripts/gcal-wrap.sh /usr/local/bin/gcal-wrap
+COPY scripts/gmail-wrap.sh /usr/local/bin/gmail-wrap
+RUN chmod 0755 /usr/local/bin/gcal-wrap /usr/local/bin/gmail-wrap
+RUN /usr/local/bin/claw-wrap --help >/dev/null
+
+# --- 4) Preserve real binaries and route gh/git through claw-wrap ---
+# This is the "proper symlink" setup:
+# - keep the real tool at /usr/local/libexec/<tool>-real
+# - make /usr/local/bin/<tool> -> /usr/local/bin/claw-wrap
+# - make /usr/bin/<tool> -> /usr/local/bin/claw-wrap (covers absolute path callers)
+RUN set -eux; \
+  install -d /usr/local/libexec; \
+  rm -f /usr/local/libexec/gh /usr/local/libexec/git /usr/local/libexec/gh-real /usr/local/libexec/git-real; \
+  cp /usr/bin/gh /usr/local/libexec/gh-real; \
+  cp /usr/bin/git /usr/local/libexec/git-real; \
+  printf '%s\n' '#!/usr/bin/env bash' 'exec -a gh /usr/local/libexec/gh-real "$@"' >/usr/local/libexec/gh; \
+  printf '%s\n' '#!/usr/bin/env bash' 'exec -a git /usr/local/libexec/git-real "$@"' >/usr/local/libexec/git; \
+  chmod 0755 /usr/local/libexec/gh /usr/local/libexec/git; \
+  ln -sf /usr/local/bin/claw-wrap /usr/local/bin/gh; \
+  ln -sf /usr/local/bin/claw-wrap /usr/local/bin/git; \
+  ln -sf /usr/local/bin/claw-wrap /usr/local/bin/gcal; \
+  ln -sf /usr/local/bin/claw-wrap /usr/local/bin/gmail; \
+  ln -sf /usr/local/bin/claw-wrap /usr/bin/gh; \
+  ln -sf /usr/local/bin/claw-wrap /usr/bin/git; \
+  ln -sf /usr/local/bin/claw-wrap /usr/bin/gcal; \
+  ln -sf /usr/local/bin/claw-wrap /usr/bin/gmail; \
+  # sanity checks: wrapper should run
+  /usr/local/bin/gh --help >/dev/null || true; \
+  /usr/local/bin/git --help >/dev/null || true; \
+  /usr/local/bin/gcal --help >/dev/null || true; \
+  /usr/local/bin/gmail --help >/dev/null || true
+
+# Git asks this helper for a password; claw-wrap injects GH_TOKEN into env.
+RUN set -eux; \
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'prompt="${1:-}"' \
+    'case "$prompt" in' \
+    '  *Username*) echo "x-access-token" ;;' \
+    '  *Password*) echo "${GH_TOKEN}" ;;' \
+    '  *) echo "${GH_TOKEN}" ;;' \
+    'esac' >/usr/local/bin/git-askpass-claw; \
+  chmod 0755 /usr/local/bin/git-askpass-claw
+
+# PinchTab helper for OpenClaw sessions: pinch <subcommand...>
+RUN set -eux; \
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'set -euo pipefail' \
+    ': "${PINCHTAB_URL:=http://pinchtab:9867}"' \
+    'export PINCHTAB_URL' \
+    'if [ -n "${PINCHTAB_TOKEN:-}" ]; then export PINCHTAB_TOKEN; fi' \
+    'exec /usr/local/bin/pinchtab "$@"' >/usr/local/bin/pinch; \
+  chmod 0755 /usr/local/bin/pinch
+
+# Optional: strongly encourage bash for tool execution
+ENV SHELL=/bin/bash
+ENV GIT_ASKPASS=/usr/local/bin/git-askpass-claw
+
+RUN /usr/local/libexec/gh --version && /usr/local/libexec/git --version && claw-wrap --help >/dev/null
+
+# Return to the original user if your base image uses node user.
+# If you know the correct user, set it here; otherwise remove this line.
+USER node

@@ -1,0 +1,130 @@
+services:
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_NPM_SPEC: ${OPENCLAW_NPM_SPEC:-openclaw@latest}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      # Make exec prefer bash (helps avoid pipefail errors)
+      SHELL: /bin/bash
+
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18789}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS: ${OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS:-}
+      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-James Bolton}
+      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-jayjaybeeuk@gmail.com}
+      GIT_COMMITTER_NAME: ${GIT_COMMITTER_NAME:-James Bolton}
+      GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-jayjaybeeuk@gmail.com}
+
+      # Convenience: where OpenClaw skills/scripts can reach PinchTab
+      PINCHTAB_URL: http://pinchtab:9867
+      PINCHTAB_TOKEN: ${PINCHTAB_TOKEN}
+
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+
+      # Shared runtime dir for claw-wrap auth + unix socket
+      - openclaw_run:/run/openclaw
+
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - clawwrapd
+      - pinchtab
+    command: [ "/usr/local/bin/start-openclaw-gateway" ]
+
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_NPM_SPEC: ${OPENCLAW_NPM_SPEC:-openclaw@latest}
+
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      # Same bash preference for exec in sandbox
+      SHELL: /bin/bash
+
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      BROWSER: echo
+
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-James Bolton}
+      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-jayjaybeeuk@gmail.com}
+      GIT_COMMITTER_NAME: ${GIT_COMMITTER_NAME:-James Bolton}
+      GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-jayjaybeeuk@gmail.com}
+
+      PINCHTAB_URL: http://pinchtab:9867
+      PINCHTAB_TOKEN: ${PINCHTAB_TOKEN}
+
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - openclaw_run:/run/openclaw
+    stdin_open: true
+    tty: true
+    init: true
+    depends_on:
+      - clawwrapd
+      - pinchtab
+    entrypoint: [ "openclaw" ]
+
+  # --- Secrets boundary / CLI proxy (claw-wrap daemon) ---
+  clawwrapd:
+    image: openclaw/clawwrapd:local
+    user: "1000:1000"
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw-tools
+    command: [ "claw-wrap", "daemon", "--uid", "1000" ]
+    volumes:
+      # You provide this file next to the compose
+      - ./wrappers.yml:/etc/openclaw/wrappers.yaml:ro
+      # Match gateway cwd paths so wrapped tools can run in-session directories
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+
+      # Shared runtime dir (auth file + unix socket)
+      - openclaw_run:/run/openclaw
+      # Mount whatever your credential backend needs (examples):
+      # - ~/.password-store:/root/.password-store:ro
+      # - ~/.config/op:/root/.config/op:ro
+    restart: unless-stopped
+
+  # --- Browser automation bridge (PinchTab) ---
+  pinchtab:
+    image: pinchtab/pinchtab:latest
+    # Keep internal-only (safer): no host ports
+    expose:
+      - "9867"
+    environment:
+      BRIDGE_BIND: "0.0.0.0"
+      BRIDGE_PORT: "9867"
+      BRIDGE_TOKEN: "${PINCHTAB_TOKEN}"
+      BRIDGE_HEADLESS: "true"
+      BRIDGE_PROFILE: "work"
+    volumes:
+      - pinchtab_data:/root/.pinchtab
+    restart: unless-stopped
+    # PinchTab runs Chrome; this is commonly needed in Docker:
+    security_opt:
+      - seccomp:unconfined
+
+volumes:
+  openclaw_run:
+  pinchtab_data:

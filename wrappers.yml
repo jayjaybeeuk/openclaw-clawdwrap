@@ -1,0 +1,60 @@
+credentials:
+  github-token:
+    source: env:GITHUB_TOKEN
+  google-client-id:
+    source: env:GOOGLE_CLIENT_ID
+  google-client-secret:
+    source: env:GOOGLE_CLIENT_SECRET
+  google-refresh-token:
+    source: env:GOOGLE_REFRESH_TOKEN
+
+tools:
+  gh:
+    binary: /usr/local/libexec/gh
+    env:
+      GH_TOKEN: github-token
+    blocked_args:
+      - pattern: "repo\\s+delete"
+        match: command
+        message: "Repository deletion is blocked"
+      - pattern: "release\\s+"
+        match: command
+        message: "Release commands are blocked by policy"
+      - pattern: "api\\s+.*(releases|repos/.*/releases).*\\s(--method|-X)\\s*DELETE(\\s|$)"
+        match: command
+        message: "Release deletion via API is blocked"
+      - pattern: "auth\\s+(login|logout|refresh|setup-git|switch|token)"
+        match: command
+        message: "This gh auth command is blocked by policy"
+
+  git:
+    binary: /usr/local/libexec/git
+    env:
+      GH_TOKEN: github-token
+      GIT_ASKPASS: /usr/local/bin/git-askpass-claw
+      GIT_TERMINAL_PROMPT: "0"
+    blocked_args:
+      # Allow branch pushes, but block direct updates/deletes of protected default branches.
+      - pattern: "push\\s+.*\\s(main|master)(\\s|$)"
+        match: command
+        message: "Direct pushes to main/master are blocked"
+      - pattern: "push\\s+.*:(main|master)(\\s|$)"
+        match: command
+        message: "Updating/deleting remote main/master is blocked"
+      - pattern: "^(--force|-f|--force-with-lease|--mirror|--delete)$"
+        match: arg
+        message: "Destructive push flags are blocked"
+
+  gcal:
+    binary: /usr/local/bin/gcal-wrap
+    env:
+      GOOGLE_CLIENT_ID: google-client-id
+      GOOGLE_CLIENT_SECRET: google-client-secret
+      GOOGLE_REFRESH_TOKEN: google-refresh-token
+
+  gmail:
+    binary: /usr/local/bin/gmail-wrap
+    env:
+      GOOGLE_CLIENT_ID: google-client-id
+      GOOGLE_CLIENT_SECRET: google-client-secret
+      GOOGLE_REFRESH_TOKEN: google-refresh-token
