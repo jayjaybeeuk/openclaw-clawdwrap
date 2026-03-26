@@ -7,12 +7,23 @@ credentials:
     source: env:GOOGLE_CLIENT_SECRET
   google-refresh-token:
     source: env:GOOGLE_REFRESH_TOKEN
+  anthropic-api-key:
+    source: env:ANTHROPIC_API_KEY
+  azure-devops-token:
+    source: env:AZURE_DEVOPS_TOKEN
 
 tools:
   gh:
     binary: /usr/local/libexec/gh
     env:
       GH_TOKEN: github-token
+    # POLICY NOTE (P1-006): The following gh sub-commands are explicitly ALLOWED
+    # and must NOT be added to blocked_args:
+    #   gh pr create       — used by agent-runner to open PRs
+    #   gh issue list      — used by IssueIngester to fetch open issues
+    #   gh issue view      — used by IssueIngester to read issue details
+    #   gh issue comment   — used by AgentOrchestrator for claim/done/failure comments
+    #   gh issue edit      — used by AgentOrchestrator to apply agent:claimed/done labels
     blocked_args:
       - pattern: "repo\\s+delete"
         match: command
@@ -58,3 +69,18 @@ tools:
       GOOGLE_CLIENT_ID: google-client-id
       GOOGLE_CLIENT_SECRET: google-client-secret
       GOOGLE_REFRESH_TOKEN: google-refresh-token
+
+  az:
+    binary: /usr/bin/az
+    env:
+      AZURE_DEVOPS_EXT_PAT: azure-devops-token
+    blocked_args:
+      - pattern: "devops\\s+project\\s+delete"
+        match: command
+        message: "Azure DevOps project deletion is blocked"
+      - pattern: "devops\\s+repo\\s+delete"
+        match: command
+        message: "Azure DevOps repo deletion is blocked"
+      - pattern: "pipelines?\\s+(delete|destroy)"
+        match: command
+        message: "Pipeline deletion is blocked"
