@@ -6,6 +6,38 @@ This folder is a portable deployment package for:
 - PinchTab bridge
 - claw-wrap daemon (GitHub auth proxy for `gh`/`git`)
 
+## Quick Start
+
+> Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/) and `make`.
+
+```bash
+# 1. Bootstrap — creates .env and generates random tokens
+make setup
+
+# 2. Fill in your secrets (two required, rest optional)
+#    GITHUB_TOKEN      — GitHub PAT with repo + workflow scopes
+#    ANTHROPIC_API_KEY — from claude.ai/account
+#    OPENCLAW_CONFIG_DIR — local path, e.g. ~/.openclaw  (change from default Windows path)
+$EDITOR .env
+
+# 3. Build images and start the stack (runs preflight check first)
+make up
+
+# 4. Inject runtime secrets into the Docker volume
+make inject-tokens
+
+# 5. Confirm everything is wired
+make validate
+
+# 6. Open the dashboard (URL includes your auth token)
+make url
+```
+
+Re-run `make inject-tokens` any time you change secrets in `.env`.
+Run `make help` to see all available commands.
+
+---
+
 ## Security model
 
 - `wrappers.yml` defines *policy* and *credential names*.
@@ -23,6 +55,10 @@ This folder is a portable deployment package for:
 
 ## Scripts
 
+- `setup.sh` - one-click bootstrap: creates `.env` from `.env.example`, generates random tokens.
+- `Makefile` - convenience targets (`make up`, `make validate`, `make logs`, …). Run `make help`.
+- `scripts/preflight.sh` - validates `.env` before any container starts; called automatically by `make up`.
+- `scripts/inject-tokens.sh` - pushes runtime secrets from `.env` into the `openclaw_run` Docker volume.
 - `scripts/start-gateway.sh` - gateway entrypoint used by the Docker stack; seeds
   Control UI allowed origins, prints a tokenized dashboard URL hint, and starts
   the gateway with the configured bind/port/token.
@@ -35,7 +71,7 @@ This folder is a portable deployment package for:
 - `scripts/refresh-google-token.sh` - helper for refreshing Google OAuth
   credentials manually when needed.
 
-## First setup on a host
+## Manual setup (detailed reference)
 
 1. Copy this folder to your target machine.
 2. Create `.env` from `.env.example`.
