@@ -460,6 +460,8 @@ P6 (wrappers.yml) ◄───────────────────�
 P7 (hardening) ◄────────────────────────────┘
                                             │
 P8 (tests) ◄────────────────────────────────┘
+
+P9 (personalities) — standalone; no upstream dependencies
 ```
 
 Critical path: **P1 → P2 → P3-001 through P3-007 → P7-001 through P7-007 → P8-003**
@@ -509,13 +511,66 @@ Critical path: **P1 → P2 → P3-001 through P3-007 → P7-001 through P7-007 �
 
 ---
 
+---
+
+## Phase 9 — Agent Personality System
+
+> Gives users a choice of three pre-built character personalities (or a blank template) for their OpenClaw agent. Personalities are defined via `SOUL.md` and `IDENTITY.md` files and loaded at session start via the boot-md hook.
+
+| ID | Status | Cat | Task | Depends |
+|---|---|---|---|---|
+| P9-001 | `[x]` | `setup` | Create `personalities/` directory with per-personality subdirectories | — |
+| P9-002 | `[x]` | `setup` | `personalities/dr-zoidberg/SOUL.md` — character, tone, and behavioural rules | P9-001 |
+| P9-003 | `[x]` | `setup` | `personalities/dr-zoidberg/IDENTITY.md` — name, creature, visual, vibe | P9-001 |
+| P9-004 | `[x]` | `setup` | `personalities/ren-hoek/SOUL.md` | P9-001 |
+| P9-005 | `[x]` | `setup` | `personalities/ren-hoek/IDENTITY.md` | P9-001 |
+| P9-006 | `[x]` | `setup` | `personalities/optimus-prime/SOUL.md` | P9-001 |
+| P9-007 | `[x]` | `setup` | `personalities/optimus-prime/IDENTITY.md` | P9-001 |
+| P9-008 | `[x]` | `setup` | `personalities/blank/SOUL.md` — authoring template with section prompts | P9-001 |
+| P9-009 | `[x]` | `setup` | `personalities/blank/IDENTITY.md` — authoring template | P9-001 |
+| P9-010 | `[x]` | `script` | `personalities/setup.sh` — interactive selector; backs up existing files; installs chosen SOUL.md + IDENTITY.md to `OPENCLAW_CONFIG_DIR` | P9-001–P9-009 |
+| P9-011 | `[x]` | `setup` | Document personality system in `AGENTS.md` — explain SOUL.md/IDENTITY.md/USER.md/boot-md hook, link to setup script | — |
+
+### How it works
+
+1. User runs `bash personalities/setup.sh` (or `docker compose exec openclaw-gateway bash /path/to/setup.sh`).
+2. Script presents 4 choices; user selects one.
+3. Selected `SOUL.md` and `IDENTITY.md` are copied to `$OPENCLAW_CONFIG_DIR/` (existing files are backed up with a timestamp suffix).
+4. The OpenClaw boot-md hook reads these files at session start, loading the personality before any conversation begins.
+
+### Personality overview
+
+| Name | Archetype | Source |
+|---|---|---|
+| Dr. Zoidberg | Strange alien doctor — obtuse but secretly brilliant | Futurama |
+| Ren Höek | Unstable chihuahua — manipulative, volatile, obsessed with pecs | Ren & Stimpy |
+| Optimus Prime | Wise Autobot father figure — strong moral values, direct, decisive | Transformers G1/Prime |
+| Blank / Custom | Empty template — user defines their own personality from scratch | — |
+
+### Key files
+
+| Path | Action |
+|---|---|
+| `personalities/dr-zoidberg/SOUL.md` | **Create** |
+| `personalities/dr-zoidberg/IDENTITY.md` | **Create** |
+| `personalities/ren-hoek/SOUL.md` | **Create** |
+| `personalities/ren-hoek/IDENTITY.md` | **Create** |
+| `personalities/optimus-prime/SOUL.md` | **Create** |
+| `personalities/optimus-prime/IDENTITY.md` | **Create** |
+| `personalities/blank/SOUL.md` | **Create** |
+| `personalities/blank/IDENTITY.md` | **Create** |
+| `personalities/setup.sh` | **Create** |
+| `AGENTS.md` | Add personality system docs |
+
+---
+
 ## Maestro Task Summary
 
 ```
-Total tasks:  41
-[ ] todo:     26
+Total tasks:  62
+[ ] todo:     36
 [~] in-progress: 0
-[x] done:     15
+[x] done:     26
 [!] blocked:  0
 ```
 
