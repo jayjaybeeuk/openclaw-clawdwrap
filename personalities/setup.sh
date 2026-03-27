@@ -8,8 +8,8 @@
 # Usage:
 #   bash personalities/setup.sh
 #
-# Or from inside the openclaw-gateway container:
-#   docker compose exec openclaw-gateway bash /agent/personalities/setup.sh
+# Note: This script is intended to be run on the host where the repo is checked out.
+# If you run it inside a container, ensure the repo (including personalities/) is bind-mounted and use the appropriate in-container path.
 
 set -euo pipefail
 
