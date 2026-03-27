@@ -82,6 +82,24 @@ Everything runs inside Docker; `git` and `gh` remain gated through `claw-wrap` s
 
 ---
 
+## Phase 0 — Bootstrap & One-Click Install
+
+> Make `docker compose up` the only command a new user needs after cloning and filling in secrets.
+
+| ID | Status | Cat | Task | Depends |
+|---|---|---|---|---|
+| P0-001 | `[x]` | `setup` | Create `setup.sh` — copies `.env.example` → `.env` if `.env` absent or empty, then prints a checklist of required values still set to placeholders | — |
+| P0-002 | `[x]` | `setup` | Add `.env` preflight check to `docker-compose.yml` or a wrapper `Makefile` target — abort with a clear error if `GITHUB_TOKEN` or `ANTHROPIC_API_KEY` is still blank/placeholder before any container starts | P0-001 |
+| P0-003 | `[x]` | `docker` | Add a `make up` / `make setup` target (or equivalent `just` recipe) that runs `setup.sh`, then `docker compose build`, then `docker compose up -d` in one command | P0-001, P0-002 |
+| P0-004 | `[x]` | `setup` | Update `README.md` with a **Quick Start** section: clone → run `./setup.sh` → fill `.env` → `make up` | P0-001, P0-003 |
+
+### Notes
+- `setup.sh` must be idempotent — re-running it should never overwrite existing `.env` values.
+- Placeholder sentinel values (e.g. `replace-with-random-token`, `xxx`) should be detected and flagged as "still needs filling".
+- The preflight check (P0-002) should be a lightweight shell check, not a Docker service, so it runs before any image pull.
+
+---
+
 ## Phase 1 — Credentials & Policy
 
 > Add the new secrets and confirm existing policy covers agent workflows.
