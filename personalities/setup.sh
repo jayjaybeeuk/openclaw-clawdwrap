@@ -60,6 +60,8 @@ printf "     $(dim "Empty authoring template. Write your own personality from sc
 echo ""
 printf "Enter choice [1-4]: "
 read -r choice
+choice="${choice#"${choice%%[![:space:]]*}"}"
+choice="${choice%"${choice##*[![:space:]]}"}"
 
 case "$choice" in
   1) PERSONALITY="dr-zoidberg"   ; LABEL="Dr. Zoidberg"   ;;
