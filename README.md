@@ -14,27 +14,83 @@ This folder is a portable deployment package for:
 # 1. Bootstrap — creates .env and generates random tokens
 make setup
 
-# 2. Fill in your secrets (two required, rest optional)
-#    GITHUB_TOKEN      — GitHub PAT with repo + workflow scopes
-#    ANTHROPIC_API_KEY — from claude.ai/account
-#    OPENCLAW_CONFIG_DIR — local path, e.g. ~/.openclaw  (change from default Windows path)
+# 2. Fill in your secrets — edit .env:
+#
+#    GITHUB_TOKEN        — required. GitHub PAT (repo + workflow scopes)
+#                          github.com → Settings → Developer settings → Personal access tokens
+#
+#    LLM_AUTH_MODE       — controls how AI providers authenticate:
+#                          oauth    = use `make login` (ChatGPT Team / Claude Team web accounts)
+#                          api_key  = use OPENAI_API_KEY / ANTHROPIC_API_KEY below
+#
+#    OPENCLAW_CONFIG_DIR — local path e.g. $HOME/.openclaw
 $EDITOR .env
 
-# 3. Build images and start the stack (runs preflight check first)
+# 3. Build images and start the stack (preflight check runs automatically)
+#    Browser opens automatically with the tokenised dashboard URL.
 make up
 
-# 4. Inject runtime secrets into the Docker volume
-make inject-tokens
+# 4. Authenticate LLM providers (one-time, OAuth mode only)
+#    Skipped if LLM_AUTH_MODE=api_key
+make login
 
 # 5. Confirm everything is wired
 make validate
-
-# 6. Open the dashboard (URL includes your auth token)
-make url
 ```
 
-Re-run `make inject-tokens` any time you change secrets in `.env`.
+Bookmark the dashboard URL that opens — it contains your auth token in the hash.
+Run `make url` at any time to reprint it.
 Run `make help` to see all available commands.
+
+---
+
+## LLM Authentication
+
+### OAuth mode (recommended — no API credits needed)
+
+Set `LLM_AUTH_MODE=oauth` in `.env`. Then after `make up`, run:
+
+```bash
+make login          # runs both steps below in sequence
+make login-openai   # OpenAI Codex — browser OAuth via ChatGPT Team account
+make login-anthropic # Anthropic — paste a token from `claude setup-token`
+```
+
+OAuth tokens are stored in `~/.openclaw/agents/main/agent/auth-profiles.json` (on the
+host, mounted into the container). They survive container restarts and rebuilds.
+
+After re-running `make login-openai`, restart the gateway to pick up the new profile:
+
+```bash
+docker compose restart openclaw-gateway
+```
+
+### API key mode
+
+Set `LLM_AUTH_MODE=api_key` in `.env` and fill in:
+
+```bash
+OPENAI_API_KEY=sk-proj-...     # platform.openai.com/api-keys
+ANTHROPIC_API_KEY=sk-ant-...   # platform.anthropic.com/settings/keys (requires API credits)
+```
+
+OpenAI is tried first; Anthropic is the fallback. At least one is required.
+
+> **Note:** Anthropic API credits are separate from claude.ai Team/Pro subscriptions.
+> If you have a Claude Team account, use OAuth mode instead.
+
+---
+
+## Dashboard access
+
+`make up` opens the browser automatically. The URL format is:
+
+```
+http://127.0.0.1:18789/#token=<your-gateway-token>
+```
+
+Always use `127.0.0.1`, not `localhost` — they are treated as different origins by the
+browser and the token stored for one will not work for the other.
 
 ---
 
@@ -44,156 +100,55 @@ Run `make help` to see all available commands.
 - Real secrets are **not** stored in repo files.
 - Runtime token is read from `/run/openclaw/env` in Docker volume `openclaw_run`.
 
+---
+
 ## Files
 
-- `docker-compose.yml` - services and mounts
-- `Dockerfile` - standalone OpenClaw base image built from npm
-- `Dockerfile.openclaw-tools` - OpenClaw image with claw-wrap + gh + git
-- `wrappers.yml` - claw-wrap tool policy
-- `.env.example` - environment template (safe to commit)
-- `AGENTS.md` / `CLAUDE.md` - AI-agent runbook entrypoint
+- `docker-compose.yml` — services and mounts
+- `Dockerfile` — OpenClaw gateway/CLI image (built from npm)
+- `Dockerfile.openclaw-tools` — claw-wrap daemon image with `gh` + `git`
+- `wrappers.yml` — claw-wrap tool policy
+- `.env.example` — environment template (safe to commit)
+- `AGENTS.md` / `CLAUDE.md` — AI-agent runbook entrypoint
 
 ## Scripts
 
-- `setup.sh` - one-click bootstrap: creates `.env` from `.env.example`, generates random tokens.
-- `Makefile` - convenience targets (`make up`, `make validate`, `make logs`, …). Run `make help`.
-- `scripts/preflight.sh` - validates `.env` before any container starts; called automatically by `make up`.
-- `scripts/inject-tokens.sh` - pushes runtime secrets from `.env` into the `openclaw_run` Docker volume.
-- `scripts/start-gateway.sh` - gateway entrypoint used by the Docker stack; seeds
-  Control UI allowed origins, prints a tokenized dashboard URL hint, and starts
-  the gateway with the configured bind/port/token.
-- `scripts/dashboard-url.sh` - prints the tokenized Control UI URL via
-  `openclaw dashboard --no-open`.
-- `scripts/gcal-wrap.sh` - Google Calendar wrapper used by `gcal`; mints a
-  short-lived access token from `GOOGLE_REFRESH_TOKEN` at call time.
-- `scripts/gmail-wrap.sh` - Gmail wrapper used by `gmail`; mints a short-lived
-  access token from `GOOGLE_REFRESH_TOKEN` at call time.
-- `scripts/refresh-google-token.sh` - helper for refreshing Google OAuth
-  credentials manually when needed.
+- `setup.sh` — one-click bootstrap: creates `.env` from `.env.example`, generates random tokens
+- `Makefile` — convenience targets (`make up`, `make login`, `make validate`, …). Run `make help`.
+- `scripts/preflight.sh` — validates `.env` before any container starts; called automatically by `make up`
+- `scripts/start-gateway.sh` — gateway entrypoint; seeds allowed origins, preserves OAuth profiles,
+  injects API keys only when `LLM_AUTH_MODE=api_key`, prints the tokenised dashboard URL
+- `scripts/inject-tokens.sh` — pushes runtime secrets from `.env` into the `openclaw_run` Docker volume
+- `scripts/dashboard-url.sh` — prints the tokenised Control UI URL
+- `scripts/gcal-wrap.sh` — Google Calendar wrapper; mints a short-lived access token from `GOOGLE_REFRESH_TOKEN` at call time
+- `scripts/gmail-wrap.sh` — Gmail wrapper; mints a short-lived access token from `GOOGLE_REFRESH_TOKEN` at call time
+- `scripts/refresh-google-token.sh` — helper for refreshing Google OAuth credentials manually
 
-## Manual setup (detailed reference)
+---
 
-1. Copy this folder to your target machine.
-2. Create `.env` from `.env.example`.
-3. Optionally pin the npm package/version used for the base image:
+## Rebuilding after script changes
 
-```powershell
-# Example: keep the latest published release
-OPENCLAW_NPM_SPEC=openclaw@latest
-```
-
-When `OPENCLAW_GATEWAY_BIND` is not `loopback`, the stack automatically allows
-Control UI origins for `http://localhost:<port>` and `http://127.0.0.1:<port>`.
-If you want to open the UI from another machine, set
-`OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS` to a comma-separated list such as
-`http://192.168.1.50:18789,http://openclaw.local:18789`.
-
-4. Build service images:
-
-```powershell
-docker compose build
-```
-
-This folder is now self-contained: `docker compose build` builds the local
-OpenClaw gateway/CLI image from `Dockerfile` and builds `clawwrapd` from
-`Dockerfile.openclaw-tools`, without depending on files outside this folder.
-
-5. Permissions preflight:
-
-```powershell
-docker run --rm -v C:\Users\User\.openclaw:/dst alpine sh -lc "chown -R 1000:1000 /dst && chmod -R u+rwX,go+rX /dst"
-```
-
-6. Set runtime GitHub + Google OAuth credentials:
-
-```powershell
-docker run --rm -v openclaw-docker-stack_openclaw_run:/run/openclaw alpine sh -lc "umask 077; printf 'GITHUB_TOKEN=ghp_or_github_pat_here\nGOOGLE_CLIENT_ID=google_client_id_here\nGOOGLE_CLIENT_SECRET=google_client_secret_here\nGOOGLE_REFRESH_TOKEN=google_refresh_token_here\n' > /run/openclaw/env; chown 1000:1000 /run/openclaw/env; chmod 600 /run/openclaw/env"
-```
-
-Update runtime tokens from `.env` (no manual paste):
-
-```powershell
-$wanted = @('GITHUB_TOKEN','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_REFRESH_TOKEN')
-$map = @{}
-Get-Content .env | ForEach-Object {
-  $line = $_.Trim()
-  if (-not $line -or $line.StartsWith('#')) { return }
-  $idx = $line.IndexOf('=')
-  if ($idx -lt 1) { return }
-  $k = $line.Substring(0,$idx).Trim()
-  $v = $line.Substring($idx+1)
-  if ($wanted -contains $k) { $map[$k] = $v }
-}
-if (-not $map['GITHUB_TOKEN']) { throw "GITHUB_TOKEN missing in .env" }
-$lines = @()
-foreach ($k in $wanted) { if ($map[$k]) { $lines += "$k=$($map[$k])" } }
-[IO.File]::WriteAllText(".env.runtime.generated", (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-docker run --rm -v ${PWD}/.env.runtime.generated:/tmp/runtime.env:ro -v openclaw-docker-stack_openclaw_run:/run/openclaw alpine sh -lc "umask 077; cp /tmp/runtime.env /run/openclaw/env; chown 1000:1000 /run/openclaw/env; chmod 600 /run/openclaw/env"
-cmd /c "del /f /q .env.runtime.generated"
-docker compose restart clawwrapd openclaw-gateway
-```
-
-Required `.env` keys for Google on-demand token minting:
+`scripts/start-gateway.sh` is baked into the Docker image at build time. After editing it,
+rebuild before restarting:
 
 ```bash
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REFRESH_TOKEN=...
+docker compose build openclaw-gateway
+docker compose up -d openclaw-gateway
 ```
 
-`gcal` and `gmail` mint a fresh Google access token from `GOOGLE_REFRESH_TOKEN` on each call.
-No periodic refresh job and no restart is required for access-token expiry.
-
-One-time OAuth code exchange (client ID prefilled):
-
-```bash
-curl -sS https://oauth2.googleapis.com/token \
-  --data-urlencode "code=PASTE_CODE_HERE" \
-  --data-urlencode "client_id=288821957916-ef089saqjkeqgvlchi32f010aepk0pks.apps.googleusercontent.com" \
-  --data-urlencode "client_secret=PASTE_CLIENT_SECRET_HERE" \
-  --data-urlencode "redirect_uri=http://localhost" \
-  --data-urlencode "grant_type=authorization_code"
-```
-
-7. Start services:
-
-```powershell
-docker compose up -d
-```
-
-or restart:
-
-```powershell
-docker compose restart clawwrapd openclaw-gateway
-```
-
-8. Open the dashboard with the gateway token already embedded.
-
-Print the tokenized URL:
-
-```powershell
-docker compose exec openclaw-gateway sh -lc "openclaw-dashboard-url"
-```
-
-You can also inspect the gateway startup logs; the container prints the same
-dashboard URL on boot when `OPENCLAW_GATEWAY_TOKEN` is set.
-
-Why this is manual-by-design:
-
-- `clawwrapd` protects wrapped CLI tools like `gh` and `git`; it does not log
-  the browser dashboard in automatically.
-- The Control UI authenticates separately over the Gateway WebSocket.
-- The supported convenience flow is a tokenized dashboard URL, which stores the
-  token in the browser's local storage on first open.
+---
 
 ## Validate
 
-```powershell
+```bash
+make validate
+# or individually:
 docker compose exec clawwrapd sh -lc "claw-wrap check"
 docker compose exec openclaw-gateway sh -lc "gh auth status --hostname github.com"
-docker compose exec openclaw-gateway sh -lc "gh api user --jq '.login'"
 docker compose exec openclaw-gateway sh -lc "gcal list-calendars"
 ```
+
+---
 
 ## Git policy (current)
 
@@ -204,16 +159,15 @@ docker compose exec openclaw-gateway sh -lc "gcal list-calendars"
 
 Still enforce branch protection in GitHub for hard guarantees.
 
+---
+
 ## Safe migration to a public repo
 
-- Keep this folder and commit only:
-  - `docker-compose.yml`
-  - `Dockerfile`
-  - `Dockerfile.openclaw-tools`
-  - `wrappers.yml`
-  - `.env.example`
-  - docs
-- Never commit:
-  - `.env`
-  - `/run/openclaw/env`
-  - real tokens/session keys
+Never commit:
+- `.env`
+- `/run/openclaw/env`
+- real tokens, session keys, or OAuth profiles
+
+Safe to commit:
+- `docker-compose.yml`, `Dockerfile`, `Dockerfile.openclaw-tools`
+- `wrappers.yml`, `.env.example`, docs

@@ -38,7 +38,7 @@ source <(grep -E '^[A-Z_]+=.' "$ENV_FILE" | grep -v '^#') 2>/dev/null || true
 set +o allexport
 
 get_raw() {
-  grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d'=' -f2- | sed 's/#.*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+  grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2- | sed 's/#.*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true
 }
 
 # ── Sentinel / empty checker ──────────────────────────────────────────────────
@@ -81,10 +81,41 @@ optional_warn() {
 # ── Required checks ───────────────────────────────────────────────────────────
 printf "\n${BLD}Pre-flight check${RST}\n"
 
-require GITHUB_TOKEN         "GitHub PAT (repo + workflow scopes)"
-require ANTHROPIC_API_KEY    "Anthropic API key — get one at claude.ai/account"
+require GITHUB_TOKEN           "GitHub PAT (repo + workflow scopes)"
 require OPENCLAW_GATEWAY_TOKEN "Random token — run ./setup.sh to generate"
-require PINCHTAB_TOKEN       "Random token — run ./setup.sh to generate"
+require PINCHTAB_TOKEN         "Random token — run ./setup.sh to generate"
+
+# ── LLM auth ──────────────────────────────────────────────────────────────────
+llm_auth_mode="$(get_raw LLM_AUTH_MODE)"
+llm_auth_mode="${llm_auth_mode:-api_key}"
+
+if [[ "$llm_auth_mode" == "oauth" ]]; then
+  # OAuth mode: check that at least one OAuth profile exists in auth-profiles.json
+  auth_file="${OPENCLAW_CONFIG_DIR:-$HOME/.openclaw}/agents/main/agent/auth-profiles.json"
+  has_oauth=$(node -e "
+    try {
+      const p = JSON.parse(require('fs').readFileSync('${auth_file}','utf8')).profiles || {};
+      const has = Object.values(p).some(v => v.mode === 'oauth' || v.type === 'oauth' || v.type === 'token');
+      process.stdout.write(has ? 'yes' : 'no');
+    } catch(_) { process.stdout.write('no'); }
+  " 2>/dev/null)
+  if [[ "$has_oauth" == "yes" ]]; then
+    ok "LLM_AUTH_MODE=oauth (OAuth profiles found — run 'make login' to refresh)"
+  else
+    warn "LLM_AUTH_MODE=oauth but no OAuth profiles found — run: make login"
+  fi
+else
+  # API key mode: at least one key required
+  openai_val="$(get_raw OPENAI_API_KEY)"
+  anthropic_val="$(get_raw ANTHROPIC_API_KEY)"
+  if is_placeholder "$openai_val" && is_placeholder "$anthropic_val"; then
+    err "LLM_AUTH_MODE=api_key but neither OPENAI_API_KEY nor ANTHROPIC_API_KEY is set"
+    FAILED=$((FAILED + 1))
+  else
+    [[ -n "$openai_val" && ! $(is_placeholder "$openai_val") ]] && ok "OPENAI_API_KEY"
+    [[ -n "$anthropic_val" && ! $(is_placeholder "$anthropic_val") ]] && ok "ANTHROPIC_API_KEY"
+  fi
+fi
 
 # ── Config dir must exist on the host ─────────────────────────────────────────
 config_dir="$(get_raw OPENCLAW_CONFIG_DIR)"

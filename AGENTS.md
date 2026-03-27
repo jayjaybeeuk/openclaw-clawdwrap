@@ -5,60 +5,103 @@ Start here when operating this stack:
 1. Read `README.md` first.
 2. Do not place secrets in repo files.
 3. Keep `wrappers.yml` token source as `env:GITHUB_TOKEN`.
-4. Put runtime tokens only in `/run/openclaw/env` via `openclaw_run` volume (`GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, optional `AZURE_DEVOPS_TOKEN`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REFRESH_TOKEN`).
-   - Sync from `.env`:
-     `powershell -Command "$wanted=@('GITHUB_TOKEN','ANTHROPIC_API_KEY','AZURE_DEVOPS_TOKEN','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_REFRESH_TOKEN'); $map=@{}; Get-Content .env | %% { $line=$_.Trim(); if(-not $line -or $line.StartsWith('#')){return}; $idx=$line.IndexOf('='); if($idx -lt 1){return}; $k=$line.Substring(0,$idx).Trim(); $v=$line.Substring($idx+1); if($wanted -contains $k){$map[$k]=$v} }; if(-not $map['GITHUB_TOKEN']){ throw 'GITHUB_TOKEN missing in .env' }; if(-not $map['ANTHROPIC_API_KEY']){ throw 'ANTHROPIC_API_KEY missing in .env' }; $lines=@(); foreach($k in $wanted){ if($map[$k]){ $lines += \"$k=$($map[$k])\" } }; [IO.File]::WriteAllText('.env.runtime.generated', (($lines -join \"`n\") + \"`n\"), (New-Object Text.UTF8Encoding($false))); docker run --rm -v ${PWD}/.env.runtime.generated:/tmp/runtime.env:ro -v openclaw-docker-stack_openclaw_run:/run/openclaw alpine sh -lc 'umask 077; cp /tmp/runtime.env /run/openclaw/env; chown 1000:1000 /run/openclaw/env; chmod 600 /run/openclaw/env'; cmd /c \"del /f /q .env.runtime.generated\"; docker compose restart clawwrapd openclaw-gateway agent-runner"`
-   - Google behavior: `gcal`/`gmail` mint short-lived access tokens from `GOOGLE_REFRESH_TOKEN` at call time (no periodic token refresh job).
-5. Validate with:
-   - `docker compose exec clawwrapd sh -lc "claw-wrap check"`
-   - `docker compose exec openclaw-gateway sh -lc "gh auth status --hostname github.com"`
 
-Google tool capability:
+---
 
-- Wrapped Google commands are available in the gateway PATH:
-  - `gcal` (Google Calendar)
-  - `gmail` (Gmail send)
-- For calendar/email tasks, prefer these commands directly instead of asking for extra auth steps.
-- Quick checks:
-  - `docker compose exec openclaw-gateway sh -lc "gcal list-calendars"`
-  - `docker compose exec openclaw-gateway sh -lc "gmail --help"`
+## LLM Auth
 
-Policy intent:
+The stack supports two auth modes, controlled by `LLM_AUTH_MODE` in `.env`:
+
+| Mode | How it works |
+|---|---|
+| `oauth` | OAuth profiles stored in `~/.openclaw/agents/main/agent/auth-profiles.json`. Set up via `make login`. No API credits needed. |
+| `api_key` | API keys in `.env` (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). Injected into `auth-profiles.json` on startup. |
+
+OAuth profiles survive container restarts. The startup script (`start-gateway.sh`) never
+overwrites OAuth profiles, even if API keys are present in `.env`.
+
+---
+
+## Runtime secrets
+
+Runtime tokens live in `/run/openclaw/env` inside the `openclaw_run` Docker volume.
+Sync from `.env` with:
+
+```bash
+make inject-tokens
+```
+
+Required keys in `/run/openclaw/env`:
+- `GITHUB_TOKEN` — GitHub PAT (repo + workflow scopes)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` — Google OAuth (optional)
+- `AZURE_DEVOPS_TOKEN` — Azure DevOps PAT (optional)
+
+Google behavior: `gcal`/`gmail` mint short-lived access tokens from `GOOGLE_REFRESH_TOKEN`
+at call time — no periodic token refresh job required.
+
+---
+
+## Validation
+
+```bash
+make validate
+docker compose exec clawwrapd sh -lc "claw-wrap check"
+docker compose exec openclaw-gateway sh -lc "gh auth status --hostname github.com"
+```
+
+---
+
+## Google tools
+
+Wrapped Google commands are available in the gateway PATH:
+
+- `gcal` — Google Calendar
+- `gmail` — Gmail send
+
+For calendar/email tasks, prefer these directly. Quick checks:
+
+```bash
+docker compose exec openclaw-gateway sh -lc "gcal list-calendars"
+docker compose exec openclaw-gateway sh -lc "gmail --help"
+```
+
+---
+
+## PinchTab
+
+This stack runs PinchTab bridge in Docker headless mode.
+
+- Use `pinch ...` commands directly.
+- Default workflow: `pinch nav` → `pinch snap -i -c` → `pinch text --raw` → `pinch click/type`.
+- Do not ask to attach a Chrome tab/extension unless relay mode is explicitly configured.
+
+---
+
+## Policy intent
 
 - Allow branch pushes and PR creation.
 - Never allow direct push/update/delete on `main`/`master`.
 - Keep destructive push flags blocked.
 
-If modifying policy, preserve the above intent.
+If modifying `wrappers.yml`, preserve the above intent.
 
-PinchTab mode note:
+---
 
-- This stack runs PinchTab bridge in Docker headless mode.
-- Agents should use `pinch ...` commands directly and should not ask for Chrome extension tab attachment unless relay mode is explicitly configured.
+## Agent-Runner branch naming
 
-## OpenClaw Runtime Policy
+Agent PRs **must** use: `agent/<issue-number>-<slug>`
 
-Environment policy (OpenClaw Docker stack):
-
-- Browser automation: use PinchTab CLI (`pinch ...`) directly.
-- Default workflow: `pinch nav`, `pinch snap -i -c`, `pinch text --raw`, then `pinch click/type`.
-- Do not ask to attach a Chrome tab/extension unless `pinch` is unavailable.
-- For Google tasks, use `gcal`/`gmail` directly.
-- Before asking for re-auth, verify with `claw-wrap check`.
-
-## Agent-Runner Branch Naming Convention
-
-Agent PRs **must** use the branch naming pattern: `agent/<issue-number>-<slug>`
-
-- `<issue-number>` is the numeric GitHub issue ID or Azure DevOps work item ID.
-- `<slug>` is a short kebab-case summary of the issue title (max 40 chars, alphanumeric + hyphens only).
+- `<issue-number>` — GitHub issue ID or Azure DevOps work item ID
+- `<slug>` — kebab-case summary, max 40 chars, alphanumeric + hyphens only
 - Examples: `agent/42-fix-login-redirect`, `agent/101-add-dark-mode`
 
-Direct pushes to `main`/`master` remain blocked by `wrappers.yml` policy.
+Direct pushes to `main`/`master` are blocked by `wrappers.yml`.
 
-## GitHub MCP Tools (P5-001)
+---
 
-The following MCP tools (`mcp__github__*`) are available in the OpenClaw gateway for issue and PR operations:
+## GitHub MCP Tools
+
+Available as `mcp__github__*` in the OpenClaw gateway:
 
 - `mcp__github__list_issues` — list open issues from a repo
 - `mcp__github__issue_read` — read a single issue by number
@@ -67,16 +110,21 @@ The following MCP tools (`mcp__github__*`) are available in the OpenClaw gateway
 - `mcp__github__pull_request_read` — read PR details
 - `mcp__github__add_issue_comment` — post a comment on an issue
 
-These tools use the `GITHUB_TOKEN` credential injected via `openclaw_run`. No extra auth setup is required.
+These use `GITHUB_TOKEN` injected via `openclaw_run`. No extra auth required.
 
-## Environment Variables (agent-runner)
+---
+
+## Environment variables
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Authenticates `claude` CLI and `@anthropic-ai/sdk` inside `agent-runner` |
-| `AZURE_DEVOPS_TOKEN` | PAT for Azure DevOps REST API (optional if only targeting GitHub) |
-| `AZURE_DEVOPS_ORG` | Azure DevOps organisation slug |
-| `AZURE_DEVOPS_PROJECT` | Azure DevOps project name |
+| `LLM_AUTH_MODE` | `oauth` (web login via `make login`) or `api_key` (API keys in `.env`) |
+| `OPENAI_API_KEY` | OpenAI API key — only used when `LLM_AUTH_MODE=api_key` |
+| `ANTHROPIC_API_KEY` | Anthropic API key — only used when `LLM_AUTH_MODE=api_key` |
+| `GITHUB_TOKEN` | GitHub PAT (repo + workflow scopes) |
+| `AZURE_DEVOPS_TOKEN` | PAT for Azure DevOps REST API (optional) |
+| `AZURE_DEVOPS_ORG` | Azure DevOps organisation slug (optional) |
+| `AZURE_DEVOPS_PROJECT` | Azure DevOps project name (optional) |
 | `AGENT_MAX_CONCURRENCY` | Max parallel issue runs (default: `1`) |
 | `AGENT_DRY_RUN` | Skip `git push` and `gh pr create` when `true` (default: `false`) |
 | `AGENT_POLL_INTERVAL_SECS` | How often to poll for new issues in seconds (default: `300`) |

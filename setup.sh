@@ -47,7 +47,8 @@ fi
 get_env() {
   local key="$1"
   # Extract value after first '='; strip inline comments; trim whitespace
-  grep -E "^${key}=" "$ENV_FILE" | head -1 | cut -d'=' -f2- | sed 's/#.*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+  # || true prevents grep's exit 1 (no match) from aborting under set -e pipefail
+  grep -E "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2- | sed 's/#.*//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true
 }
 
 set_env() {
@@ -130,7 +131,28 @@ check_optional() {
 
 # Required for core stack
 check_required GITHUB_TOKEN        "GitHub PAT with repo + workflow scopes"
-check_required ANTHROPIC_API_KEY   "Anthropic API key (claude.ai/account)"
+
+# LLM auth — behaviour depends on LLM_AUTH_MODE
+llm_auth_mode="$(get_env LLM_AUTH_MODE)"
+llm_auth_mode="${llm_auth_mode:-api_key}"
+
+if [[ "$llm_auth_mode" == "oauth" ]]; then
+  ok "LLM_AUTH_MODE=oauth — run 'make login' after 'make up' to authenticate"
+else
+  openai_val="$(get_env OPENAI_API_KEY)"
+  anthropic_val="$(get_env ANTHROPIC_API_KEY)"
+  if [[ -z "$openai_val" && -z "$anthropic_val" ]]; then
+    err "LLM_AUTH_MODE=api_key but no key set — set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+    err "  Or switch to OAuth: set LLM_AUTH_MODE=oauth and run 'make login'"
+    MISSING=$((MISSING + 1))
+  elif [[ -n "$openai_val" ]]; then
+    ok "OPENAI_API_KEY is set (primary)"
+    [[ -n "$anthropic_val" ]] && ok "ANTHROPIC_API_KEY is set (fallback)" || warn "ANTHROPIC_API_KEY not set — no fallback"
+  else
+    warn "OPENAI_API_KEY not set — Anthropic will be used as primary"
+    ok "ANTHROPIC_API_KEY is set"
+  fi
+fi
 
 # Optional — Azure DevOps agent support
 check_optional AZURE_DEVOPS_TOKEN   "Azure DevOps PAT (only needed for ADO repos)"
@@ -148,12 +170,15 @@ section "Summary"
 if [[ "$MISSING" -eq 0 ]]; then
   printf "\n${GRN}${BLD}All required secrets are set.${RST}\n"
   printf "\nNext steps:\n"
-  printf "  1.  ${BLD}docker compose build${RST}\n"
-  printf "  2.  ${BLD}docker compose up -d${RST}\n"
-  printf "  3.  Inject runtime tokens into the openclaw_run volume:\n"
-  printf "      See AGENTS.md → 'Sync from .env' for the one-liner.\n\n"
+  printf "  1.  ${BLD}make up${RST}        — build images and start the stack\n"
+  if [[ "$llm_auth_mode" == "oauth" ]]; then
+    printf "  2.  ${BLD}make login${RST}     — authenticate OpenAI + Anthropic via web login (one-time)\n"
+    printf "  3.  ${BLD}make validate${RST}  — confirm everything is wired\n\n"
+  else
+    printf "  2.  ${BLD}make validate${RST}  — confirm everything is wired\n\n"
+  fi
 else
   printf "\n${YEL}${BLD}%d required secret(s) still need filling in .env.${RST}\n" "$MISSING"
-  printf "\nEdit ${BLD}.env${RST}, then re-run ${BLD}./setup.sh${RST} to verify.\n\n"
-  exit 1
+  printf "\nEdit ${BLD}.env${RST}, then re-run ${BLD}./setup.sh${RST} to verify.\n"
+  printf "(${BLD}make up${RST} will also catch this before starting any containers.)\n\n"
 fi
