@@ -31,10 +31,10 @@ install_file() {
   fi
   if [[ -f "$dest" ]]; then
     local backup="${dest}.bak.$(date +%Y%m%d%H%M%S)"
-    cp "$dest" "$backup"
+    cp -- "$dest" "$backup"
     echo "  $(dim "backed up") existing $label → $(dim "$backup")"
   fi
-  cp "$src" "$dest"
+  cp -- "$src" "$dest"
   echo "  $(green "installed") $label → $dest"
 }
 
