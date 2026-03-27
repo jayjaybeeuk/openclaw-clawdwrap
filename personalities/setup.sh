@@ -14,7 +14,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-$HOME/.openclaw}"
+if [[ -n "${OPENCLAW_CONFIG_DIR-}" ]]; then
+  CONFIG_DIR="$OPENCLAW_CONFIG_DIR"
+elif [[ -n "${HOME-}" ]]; then
+  CONFIG_DIR="$HOME/.openclaw"
+else
+  echo "error: neither OPENCLAW_CONFIG_DIR nor HOME is set; cannot determine OpenClaw config directory." >&2
+  exit 1
+fi
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
