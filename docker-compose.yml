@@ -27,6 +27,11 @@ services:
       PINCHTAB_URL: http://pinchtab:9867
       PINCHTAB_TOKEN: ${PINCHTAB_TOKEN}
 
+      # LLM auth — set LLM_AUTH_MODE=oauth to use `make login` instead of API keys.
+      LLM_AUTH_MODE: ${LLM_AUTH_MODE:-api_key}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace

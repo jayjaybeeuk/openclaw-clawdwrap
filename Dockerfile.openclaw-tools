@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-FROM golang:1.24-bookworm AS clawwrap-builder
+FROM golang:1.26-bookworm AS clawwrap-builder
 
 RUN set -eux; \
   apt-get update; \
@@ -39,7 +39,7 @@ RUN set -eux; \
   rm -rf /var/lib/apt/lists/*
 
 # --- 3) Install claw-wrap wrapper (build from source to avoid GHCR pulls) ---
-# Built in a Go 1.24 stage to match claw-wrap's module requirements.
+# Built in a Go 1.26 stage to match claw-wrap's module requirements.
 COPY --from=clawwrap-builder /usr/local/bin/claw-wrap /usr/local/bin/claw-wrap
 COPY --from=pinchtab-cli /usr/local/bin/pinchtab /usr/local/bin/pinchtab
 COPY scripts/gcal-wrap.sh /usr/local/bin/gcal-wrap
