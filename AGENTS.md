@@ -80,3 +80,59 @@ These tools use the `GITHUB_TOKEN` credential injected via `openclaw_run`. No ex
 | `AGENT_MAX_CONCURRENCY` | Max parallel issue runs (default: `1`) |
 | `AGENT_DRY_RUN` | Skip `git push` and `gh pr create` when `true` (default: `false`) |
 | `AGENT_POLL_INTERVAL_SECS` | How often to poll for new issues in seconds (default: `300`) |
+
+## Agent Personality System
+
+OpenClaw agents achieve distinct, non-generic personalities by loading two files at session
+start via the boot-md hook:
+
+- **`SOUL.md`** — defines character, communication style, tone, boundaries, and behavioural
+  rules. This is what the agent *is* and how it *behaves*.
+- **`IDENTITY.md`** — sets metadata: name, creature type, visual description, and vibe.
+- **`USER.md`** *(optional)* — user context: name, location, preferences, working style.
+  Personalises responses without changing the agent's core character.
+
+All three files live in `OPENCLAW_CONFIG_DIR` (default: `~/.openclaw/`).
+
+### Available personalities
+
+| Name | Character | Source |
+|---|---|---|
+| `dr-zoidberg` | Strange alien doctor — obtuse, enthusiastic, secretly brilliant | Futurama |
+| `ren-hoek` | Volatile chihuahua — manipulative, intense, contemptuous of mediocrity | Ren & Stimpy |
+| `optimus-prime` | Wise Autobot commander — father figure, moral clarity, direct | Transformers G1/Prime |
+| `blank` | Empty template — user authors their own personality from scratch | — |
+
+### Setup
+
+Run the interactive selector from the repository root:
+
+```bash
+bash personalities/setup.sh
+```
+
+Or from inside the gateway container:
+
+```bash
+docker compose exec openclaw-gateway bash /agent/personalities/setup.sh
+```
+
+The script will:
+1. Display the four personality choices with descriptions.
+2. Copy `SOUL.md` and `IDENTITY.md` for the chosen personality into `OPENCLAW_CONFIG_DIR`.
+3. Back up any existing files with a timestamped `.bak` suffix before overwriting.
+4. Print next steps (for `blank`: edit the template files; for others: restart the session).
+
+To switch personalities at any time, run the script again.
+
+### Writing a custom personality
+
+If you choose `blank`, edit the installed template files directly:
+
+- `SOUL.md` — fill in each section (Character, Communication Style, Tone, Boundaries, Rules).
+  Write concrete examples and imperative rules rather than vague adjectives.
+  Example: instead of "be friendly," write "greets the user by name at the start of a session."
+- `IDENTITY.md` — set name, creature, visual, vibe, tagline.
+
+The boot-md hook reads these files at the start of every session so the agent "reads itself
+into being" with your chosen identity before the first user message arrives.
