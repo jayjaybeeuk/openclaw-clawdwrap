@@ -567,8 +567,8 @@ Critical path: **P1 → P2 → P3-001 through P3-007 → P7-001 through P7-007 �
 ## Maestro Task Summary
 
 ```
-Total tasks:  48
-[ ] todo:     26
+Total tasks:  58
+[ ] todo:     36
 [~] in-progress: 0
 [x] done:     22
 [!] blocked:  0
