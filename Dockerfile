@@ -22,6 +22,7 @@ COPY --from=pinchtab-cli /usr/local/bin/pinchtab /usr/local/bin/pinchtab
 COPY scripts/gcal-wrap.sh /usr/local/bin/gcal-wrap
 COPY scripts/gmail-wrap.sh /usr/local/bin/gmail-wrap
 COPY scripts/load-runtime-env.sh /usr/local/libexec/openclaw-load-runtime-env
+COPY scripts/google-auth-lib.sh /usr/local/libexec/google-auth-lib.sh
 COPY scripts/start-gateway.sh /usr/local/bin/start-openclaw-gateway
 COPY scripts/dashboard-url.sh /usr/local/bin/openclaw-dashboard-url
 

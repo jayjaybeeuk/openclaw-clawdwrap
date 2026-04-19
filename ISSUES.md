@@ -28,7 +28,7 @@ Tick each off as fixed.
 
 ## 🟡 Medium — causes confusion or maintenance pain
 
-- [ ] **M1** `mint_access_token()` and `require_oauth()` duplicated across gcal + gmail wrappers
+- [x] **M1** `mint_access_token()` and `require_oauth()` duplicated across gcal + gmail wrappers
   - `gcal-wrap.sh` and `gmail-wrap.sh` are byte-for-byte identical in their top ~35 lines.
     A bug or API change in the token minting logic needs fixing in two places.
   - Fix: extract to `scripts/google-auth-lib.sh`; source it from both wrappers.

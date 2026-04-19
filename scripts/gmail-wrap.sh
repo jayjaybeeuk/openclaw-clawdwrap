@@ -1,50 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RUNTIME_ENV_HELPER="/usr/local/libexec/openclaw-load-runtime-env"
-
-if [[ ! -f "$RUNTIME_ENV_HELPER" ]]; then
-  RUNTIME_ENV_HELPER="${SCRIPT_DIR}/load-runtime-env.sh"
-fi
-
+_LIB="/usr/local/libexec/google-auth-lib.sh"
+[[ ! -f "$_LIB" ]] && _LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/google-auth-lib.sh"
 # shellcheck disable=SC1090
-source "$RUNTIME_ENV_HELPER"
-load_runtime_env /run/openclaw/env
+source "$_LIB"; unset _LIB
 
 API_BASE="https://gmail.googleapis.com/gmail/v1/users/me/messages"
-
-require_oauth() {
-  if [[ -z "${GOOGLE_CLIENT_ID:-}" || -z "${GOOGLE_CLIENT_SECRET:-}" || -z "${GOOGLE_REFRESH_TOKEN:-}" ]]; then
-    echo "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN are required" >&2
-    exit 2
-  fi
-}
-
-mint_access_token() {
-  local response token
-  response="$(
-    curl -fsS https://oauth2.googleapis.com/token \
-      --data-urlencode "client_id=${GOOGLE_CLIENT_ID}" \
-      --data-urlencode "client_secret=${GOOGLE_CLIENT_SECRET}" \
-      --data-urlencode "refresh_token=${GOOGLE_REFRESH_TOKEN}" \
-      --data-urlencode "grant_type=refresh_token"
-  )"
-  token="$(
-    printf '%s' "$response" | node -e '
-      let s=""; process.stdin.on("data",d=>s+=d); process.stdin.on("end",()=>{
-        const j=JSON.parse(s);
-        if (!j.access_token) process.exit(3);
-        process.stdout.write(j.access_token);
-      });
-    ' || true
-  )"
-  if [[ -z "$token" ]]; then
-    echo "Failed to mint Google access token" >&2
-    exit 1
-  fi
-  GOOGLE_ACCESS_TOKEN="$token"
-}
 
 usage() {
   cat <<'EOF'
