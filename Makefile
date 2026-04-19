@@ -54,6 +54,10 @@ preflight:  ## Run pre-flight checks without starting anything
 inject-tokens:  ## Inject runtime secrets from .env into the openclaw_run volume
 	@bash scripts/inject-tokens.sh
 
+.PHONY: token-health
+token-health:  ## Check GitHub, Google, and LLM auth health from config + live containers
+	@bash scripts/token-health.sh
+
 # ── Inspection helpers ────────────────────────────────────────────────────────
 
 .PHONY: login

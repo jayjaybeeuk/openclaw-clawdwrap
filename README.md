@@ -36,11 +36,65 @@ make login
 
 # 5. Confirm everything is wired
 make validate
+make token-health
 ```
 
 Bookmark the dashboard URL that opens — it contains your auth token in the hash.
 Run `make url` at any time to reprint it.
 Run `make help` to see all available commands.
+
+---
+
+## Windows Notes
+
+There are two supported ways to run this stack on Windows. Pick one and keep the
+path style in `.env` consistent with that shell:
+
+- `WSL / Git Bash / Linux-style shell` â€” use Linux paths such as `/home/user/.openclaw`
+- `PowerShell / CMD` â€” use Windows paths such as `C:\Users\User\.openclaw`
+
+Examples:
+
+```env
+# WSL / Linux-style shell
+OPENCLAW_CONFIG_DIR=/home/user/.openclaw
+OPENCLAW_WORKSPACE_DIR=/home/user/workspace
+
+# PowerShell / CMD
+OPENCLAW_CONFIG_DIR=C:\Users\User\.openclaw
+OPENCLAW_WORKSPACE_DIR=C:\Users\User\workspace
+```
+
+If you are using PowerShell or CMD, `make` is optional. The direct equivalents are:
+
+```powershell
+docker compose build
+docker compose up -d
+.\scripts\inject-tokens.ps1
+docker compose restart openclaw-gateway
+docker compose logs -f openclaw-gateway
+```
+
+Run `.\scripts\inject-tokens.ps1` after `docker compose up -d` and any time you
+change `GITHUB_TOKEN`, Google OAuth credentials, or other runtime secrets in `.env`.
+To manually refresh a Google access token on native Windows, use
+`.\scripts\refresh-google-token.ps1 -SyncRuntime` or add `-Restart`.
+To check what needs reauthorization on native Windows, use
+`.\scripts\token-health.ps1`.
+
+If you want to keep using the `make` workflow from PowerShell, run it through WSL:
+
+```powershell
+wsl bash -lc "cd /mnt/c/Users/User/Documents/git/openclaw-docker && make up"
+wsl bash -lc "cd /mnt/c/Users/User/Documents/git/openclaw-docker && make login-openai"
+```
+
+Do not mix Windows paths with WSL-launched `docker compose`, or Linux paths with
+PowerShell-launched `docker compose`, or you may hit mount/permission errors such as:
+
+```text
+EACCES: permission denied, open '/home/node/.openclaw/openclaw.json'
+```
 
 ---
 
@@ -62,6 +116,13 @@ host, mounted into the container). They survive container restarts and rebuilds.
 After re-running `make login-openai`, restart the gateway to pick up the new profile:
 
 ```bash
+docker compose restart openclaw-gateway
+```
+
+In PowerShell, if you are not using `make`, the equivalent login flow is:
+
+```powershell
+wsl bash -lc "cd /mnt/c/Users/User/Documents/git/openclaw-docker && make login-openai"
 docker compose restart openclaw-gateway
 ```
 
@@ -117,12 +178,17 @@ browser and the token stored for one will not work for the other.
 - `Makefile` — convenience targets (`make up`, `make login`, `make validate`, …). Run `make help`.
 - `scripts/preflight.sh` — validates `.env` before any container starts; called automatically by `make up`
 - `scripts/start-gateway.sh` — gateway entrypoint; seeds allowed origins, preserves OAuth profiles,
-  injects API keys only when `LLM_AUTH_MODE=api_key`, prints the tokenised dashboard URL
+  imports runtime secrets from `/run/openclaw/env`, injects API keys only when `LLM_AUTH_MODE=api_key`,
+  prints the tokenised dashboard URL
 - `scripts/inject-tokens.sh` — pushes runtime secrets from `.env` into the `openclaw_run` Docker volume
+- `scripts/inject-tokens.ps1` — PowerShell equivalent of runtime secret injection for Windows users
+- `scripts/token-health.sh` — checks GitHub, Google, and LLM auth health on macOS/Linux/Git Bash
+- `scripts/token-health.ps1` — PowerShell equivalent of token/auth health checks for Windows users
 - `scripts/dashboard-url.sh` — prints the tokenised Control UI URL
 - `scripts/gcal-wrap.sh` — Google Calendar wrapper; mints a short-lived access token from `GOOGLE_REFRESH_TOKEN` at call time
 - `scripts/gmail-wrap.sh` — Gmail wrapper; mints a short-lived access token from `GOOGLE_REFRESH_TOKEN` at call time
 - `scripts/refresh-google-token.sh` — helper for refreshing Google OAuth credentials manually
+- `scripts/refresh-google-token.ps1` — PowerShell equivalent of Google OAuth refresh for Windows users
 
 ---
 
@@ -142,11 +208,48 @@ docker compose up -d openclaw-gateway
 
 ```bash
 make validate
+make token-health
 # or individually:
 docker compose exec clawwrapd sh -lc "claw-wrap check"
 docker compose exec openclaw-gateway sh -lc "gh auth status --hostname github.com"
+docker compose exec openclaw-gateway sh -lc "gh api user --jq '.login'"
 docker compose exec openclaw-gateway sh -lc "gcal list-calendars"
 ```
+
+---
+
+## Google Re-Auth
+
+If `gcal`/`gmail` start failing with Google OAuth errors such as `invalid_grant`,
+your `GOOGLE_REFRESH_TOKEN` in `.env` is no longer valid and must be replaced.
+
+Quick recovery flow:
+
+1. Re-authorize the Google OAuth client and request the needed scopes again.
+2. Copy the new refresh token into `GOOGLE_REFRESH_TOKEN` in `.env`.
+3. Refresh and sync runtime secrets:
+
+```bash
+bash scripts/refresh-google-token.sh --restart
+```
+
+On native Windows/PowerShell, use:
+
+```powershell
+.\scripts\refresh-google-token.ps1 -Restart
+```
+
+Notes:
+
+- `gcal` and `gmail` normally mint short-lived access tokens from `GOOGLE_REFRESH_TOKEN`
+  at call time, so this re-auth flow is only needed when the long-lived refresh token
+  has been revoked, expired, or was issued for a different OAuth client.
+- If you generate a new refresh token via the OAuth Playground, make sure you use your
+  own OAuth client credentials and request offline access, or the Playground token may
+  not be suitable for long-term use.
+- After any token change or re-auth, run `make token-health` on macOS/Linux/Git Bash or
+  `.\scripts\token-health.ps1` on native Windows to confirm what is healthy and what
+  still needs attention.
 
 ---
 

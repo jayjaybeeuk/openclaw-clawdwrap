@@ -9,6 +9,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/runtime-volume.sh"
 
 RED='\033[0;31m'
 GRN='\033[0;32m'
@@ -47,9 +51,7 @@ if [[ -z "$runtime_content" ]]; then
   exit 1
 fi
 
-# Detect compose project name for the volume prefix
-COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-$(basename "$ROOT" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/-*$//')}"
-VOLUME="${COMPOSE_PROJECT}_openclaw_run"
+VOLUME="$(detect_runtime_volume "$ROOT")"
 
 printf "\n${BLD}Injecting runtime tokens into volume: %s${RST}\n" "$VOLUME"
 

@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_ENV_HELPER="/usr/local/libexec/openclaw-load-runtime-env"
+
+if [[ ! -f "$RUNTIME_ENV_HELPER" ]]; then
+  RUNTIME_ENV_HELPER="${SCRIPT_DIR}/load-runtime-env.sh"
+fi
+
+# shellcheck disable=SC1090
+source "$RUNTIME_ENV_HELPER"
+load_runtime_env /run/openclaw/env
+
 API_BASE="https://gmail.googleapis.com/gmail/v1/users/me/messages"
 
 require_oauth() {

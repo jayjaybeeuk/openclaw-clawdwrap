@@ -44,7 +44,8 @@ COPY --from=clawwrap-builder /usr/local/bin/claw-wrap /usr/local/bin/claw-wrap
 COPY --from=pinchtab-cli /usr/local/bin/pinchtab /usr/local/bin/pinchtab
 COPY scripts/gcal-wrap.sh /usr/local/bin/gcal-wrap
 COPY scripts/gmail-wrap.sh /usr/local/bin/gmail-wrap
-RUN chmod 0755 /usr/local/bin/gcal-wrap /usr/local/bin/gmail-wrap
+COPY scripts/load-runtime-env.sh /usr/local/libexec/openclaw-load-runtime-env
+RUN chmod 0755 /usr/local/bin/gcal-wrap /usr/local/bin/gmail-wrap /usr/local/libexec/openclaw-load-runtime-env
 RUN /usr/local/bin/claw-wrap --help >/dev/null
 
 # --- 4) Preserve real binaries and route gh/git through claw-wrap ---

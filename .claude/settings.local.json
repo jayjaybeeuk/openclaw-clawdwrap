@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/c/Users/User/Documents/git/**)",
+      "Bash(docker compose:*)"
+    ]
+  }
+}

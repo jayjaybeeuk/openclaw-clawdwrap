@@ -31,6 +31,24 @@ Sync from `.env` with:
 make inject-tokens
 ```
 
+On native Windows/PowerShell, use:
+
+```powershell
+.\scripts\inject-tokens.ps1
+```
+
+To assess what needs reauthorization, use:
+
+```bash
+make token-health
+```
+
+Or on native Windows/PowerShell:
+
+```powershell
+.\scripts\token-health.ps1
+```
+
 Required keys in `/run/openclaw/env`:
 - `GITHUB_TOKEN` — GitHub PAT (repo + workflow scopes)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` — Google OAuth (optional)
@@ -38,6 +56,12 @@ Required keys in `/run/openclaw/env`:
 
 Google behavior: `gcal`/`gmail` mint short-lived access tokens from `GOOGLE_REFRESH_TOKEN`
 at call time — no periodic token refresh job required.
+
+If a manual Google token refresh is needed on native Windows, use:
+
+```powershell
+.\scripts\refresh-google-token.ps1 -SyncRuntime
+```
 
 ---
 
@@ -47,6 +71,7 @@ at call time — no periodic token refresh job required.
 make validate
 docker compose exec clawwrapd sh -lc "claw-wrap check"
 docker compose exec openclaw-gateway sh -lc "gh auth status --hostname github.com"
+docker compose exec openclaw-gateway sh -lc "gh api user --jq '.login'"
 ```
 
 ---

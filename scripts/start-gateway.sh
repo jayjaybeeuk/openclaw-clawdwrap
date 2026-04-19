@@ -4,6 +4,25 @@ set -euo pipefail
 bind="${OPENCLAW_GATEWAY_BIND:-lan}"
 port="${OPENCLAW_GATEWAY_PORT:-18789}"
 token="${OPENCLAW_GATEWAY_TOKEN:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_ENV_HELPER="/usr/local/libexec/openclaw-load-runtime-env"
+
+if [[ ! -f "$RUNTIME_ENV_HELPER" ]]; then
+  RUNTIME_ENV_HELPER="${SCRIPT_DIR}/load-runtime-env.sh"
+fi
+
+# shellcheck disable=SC1090
+source "$RUNTIME_ENV_HELPER"
+
+# Import runtime secrets written into the shared Docker volume so native gateway
+# tools (gh, gcal, gmail, MCP integrations) see the same credentials as
+# claw-wrap without requiring host-shell-specific env injection.
+load_runtime_env /run/openclaw/env
+
+# gh prefers GH_TOKEN; the runtime env file stores GITHUB_TOKEN.
+if [[ -z "${GH_TOKEN:-}" && -n "${GITHUB_TOKEN:-}" ]]; then
+  export GH_TOKEN="${GITHUB_TOKEN}"
+fi
 
 # Ensure gateway runs in local mode (required for browser UI connections).
 # Patch the JSON config directly — `openclaw config set gateway.mode` does not
@@ -17,7 +36,15 @@ try { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) {
 }
 cfg.gateway = cfg.gateway || {};
 cfg.gateway.mode = 'local';
-fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+try {
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+} catch (e) {
+  if (e.code !== 'EACCES') throw e;
+  // File has wrong permissions — delete via directory write-perm and recreate.
+  // unlink() requires the parent dir to be writable (set by entrypoint), not the file.
+  try { fs.unlinkSync(p); } catch (_) {}
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+}
 EOF
 
 # Merge API key profiles into auth-profiles.json.

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE=".env"
-RUNTIME_VOLUME="openclaw-docker-stack_openclaw_run"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$ROOT/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SYNC_RUNTIME=0
 RESTART_SERVICES=0
+
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/runtime-volume.sh"
 
 usage() {
   cat <<'EOF'
@@ -20,7 +24,7 @@ Usage:
 
 Options:
   --env-file <path>  Path to env file (default: .env)
-  --sync-runtime     Write GITHUB_TOKEN + GOOGLE_ACCESS_TOKEN to /run/openclaw/env volume
+  --sync-runtime     Write runtime secrets to /run/openclaw/env in the detected Docker volume
   --restart          Restart clawwrapd + openclaw-gateway (implies --sync-runtime)
   -h, --help         Show this help
 EOF
@@ -30,6 +34,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --env-file)
       ENV_FILE="${2:-}"
+      if [[ "$ENV_FILE" != /* && ! "$ENV_FILE" =~ ^[A-Za-z]:[\\/].* ]]; then
+        ENV_FILE="$ROOT/$ENV_FILE"
+      fi
       shift 2
       ;;
     --sync-runtime)
@@ -95,6 +102,7 @@ CLIENT_ID="$(read_env GOOGLE_CLIENT_ID)"
 CLIENT_SECRET="$(read_env GOOGLE_CLIENT_SECRET)"
 REFRESH_TOKEN="$(read_env GOOGLE_REFRESH_TOKEN)"
 GITHUB_TOKEN="$(read_env GITHUB_TOKEN)"
+RUNTIME_VOLUME="$(detect_runtime_volume "$ROOT")"
 
 if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$REFRESH_TOKEN" ]]; then
   echo "Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN in $ENV_FILE" >&2
@@ -152,14 +160,21 @@ fi
 echo "Updated GOOGLE_ACCESS_TOKEN in $ENV_FILE"
 
 if [[ "$SYNC_RUNTIME" -eq 1 ]]; then
+  echo "Syncing runtime secrets to volume ${RUNTIME_VOLUME}"
   docker run --rm \
     -e GH_TOKEN="$GITHUB_TOKEN" \
+    -e GOOG_CLIENT_ID="$CLIENT_ID" \
+    -e GOOG_CLIENT_SECRET="$CLIENT_SECRET" \
+    -e GOOG_REFRESH_TOKEN="$REFRESH_TOKEN" \
     -e GOOG_TOKEN="$ACCESS_TOKEN" \
     -v "${RUNTIME_VOLUME}:/run/openclaw" \
     alpine sh -lc '
       umask 077
       {
         if [ -n "$GH_TOKEN" ]; then echo "GITHUB_TOKEN=$GH_TOKEN"; fi
+        if [ -n "$GOOG_CLIENT_ID" ]; then echo "GOOGLE_CLIENT_ID=$GOOG_CLIENT_ID"; fi
+        if [ -n "$GOOG_CLIENT_SECRET" ]; then echo "GOOGLE_CLIENT_SECRET=$GOOG_CLIENT_SECRET"; fi
+        if [ -n "$GOOG_REFRESH_TOKEN" ]; then echo "GOOGLE_REFRESH_TOKEN=$GOOG_REFRESH_TOKEN"; fi
         echo "GOOGLE_ACCESS_TOKEN=$GOOG_TOKEN"
       } > /run/openclaw/env
       chown 1000:1000 /run/openclaw/env
@@ -169,6 +184,6 @@ if [[ "$SYNC_RUNTIME" -eq 1 ]]; then
 fi
 
 if [[ "$RESTART_SERVICES" -eq 1 ]]; then
-  docker compose restart clawwrapd openclaw-gateway
+  docker compose --project-directory "$ROOT" restart clawwrapd openclaw-gateway
   echo "Restarted clawwrapd and openclaw-gateway"
 fi
