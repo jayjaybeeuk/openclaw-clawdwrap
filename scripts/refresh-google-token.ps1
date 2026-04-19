@@ -16,32 +16,10 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot "runtime-volume.ps1")
+. (Join-Path $PSScriptRoot "env-utils.ps1")
 
 if (-not [System.IO.Path]::IsPathRooted($EnvFile)) {
   $EnvFile = Join-Path $root $EnvFile
-}
-
-function Read-EnvValue {
-  param(
-    [string]$Key,
-    [string[]]$Lines
-  )
-
-  $line = $Lines | Where-Object { $_ -match "^${Key}=" } | Select-Object -First 1
-  if (-not $line) {
-    return ""
-  }
-
-  $value = $line -replace "^${Key}=", ""
-  $value = $value.TrimEnd("`r")
-
-  if ($value.Length -ge 2) {
-    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
-      $value = $value.Substring(1, $value.Length - 2)
-    }
-  }
-
-  return $value
 }
 
 function Write-EnvValue {

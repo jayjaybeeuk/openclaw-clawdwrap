@@ -11,31 +11,11 @@ $envFile = Join-Path $root ".env"
 $failed = 0
 $warned = 0
 . (Join-Path $PSScriptRoot "runtime-volume.ps1")
+. (Join-Path $PSScriptRoot "env-utils.ps1")
 
 function Write-Ok($Message) { Write-Host "  [OK] $Message" -ForegroundColor Green }
 function Write-WarnLine($Message) { Write-Host "  [WARN] $Message" -ForegroundColor Yellow }
 function Write-ErrLine($Message) { Write-Host "  [ERR] $Message" -ForegroundColor Red }
-
-function Read-EnvValue {
-  param(
-    [string]$Key,
-    [string[]]$Lines
-  )
-
-  $line = $Lines | Where-Object { $_ -match "^${Key}=" } | Select-Object -First 1
-  if (-not $line) { return "" }
-
-  $value = $line -replace "^${Key}=", ""
-  $value = $value.Trim()
-
-  if ($value.Length -ge 2) {
-    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
-      $value = $value.Substring(1, $value.Length - 2)
-    }
-  }
-
-  return $value.Trim()
-}
 
 function Invoke-CmdCapture {
   param([string]$Command)

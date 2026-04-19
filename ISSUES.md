@@ -34,7 +34,7 @@ Tick each off as fixed.
   - Fix: extract to `scripts/google-auth-lib.sh`; source it from both wrappers.
   - Files: `scripts/gcal-wrap.sh`, `scripts/gmail-wrap.sh`
 
-- [ ] **M2** `Read-EnvValue` duplicated across PowerShell scripts
+- [x] **M2** `Read-EnvValue` duplicated across PowerShell scripts
   - `token-health.ps1` and `refresh-google-token.ps1` each define their own version with slightly
     different comment-stripping behaviour.
   - Fix: extract to a new `scripts/env-utils.ps1` (not `runtime-volume.ps1` — keep that focused);
