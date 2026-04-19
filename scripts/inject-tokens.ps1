@@ -12,7 +12,7 @@ $envFile = Join-Path $root ".env"
 . (Join-Path $PSScriptRoot "runtime-volume.ps1")
 
 if (-not (Test-Path -LiteralPath $envFile)) {
-  throw ".env not found - run ./setup.sh first"
+  throw ".env not found - run .\setup.ps1 first (or setup.sh via WSL)"
 }
 
 $runtimeKeys = @(

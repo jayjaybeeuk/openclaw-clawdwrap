@@ -44,7 +44,7 @@ Tick each off as fixed.
 - [x] **M3** No `.dockerignore` — full context (including `.git/`) sent on every build
   - Fix: add `.dockerignore` at repo root excluding `.git`, `.env`, `*.md`, `personalities/`, etc.
 
-- [ ] **M5** `inject-tokens.ps1` error says "run ./setup.sh" — bash-only on Windows
+- [x] **M5** `inject-tokens.ps1` error says "run ./setup.sh" — bash-only on Windows
   - A Windows-native user without WSL cannot run `setup.sh`.
   - Fix: update the error message to mention WSL, or create `setup.ps1`.
   - Files: `scripts/inject-tokens.ps1`
