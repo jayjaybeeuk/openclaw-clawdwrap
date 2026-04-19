@@ -84,6 +84,8 @@ $clientId = Read-EnvValue -Key "GOOGLE_CLIENT_ID" -Lines $envLines
 $clientSecret = Read-EnvValue -Key "GOOGLE_CLIENT_SECRET" -Lines $envLines
 $refreshToken = Read-EnvValue -Key "GOOGLE_REFRESH_TOKEN" -Lines $envLines
 $githubToken = Read-EnvValue -Key "GITHUB_TOKEN" -Lines $envLines
+$anthropicKey = Read-EnvValue -Key "ANTHROPIC_API_KEY" -Lines $envLines
+$azureToken = Read-EnvValue -Key "AZURE_DEVOPS_TOKEN" -Lines $envLines
 
 if ([string]::IsNullOrWhiteSpace($clientId) -or [string]::IsNullOrWhiteSpace($clientSecret) -or [string]::IsNullOrWhiteSpace($refreshToken)) {
   throw "Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN in $EnvFile"
@@ -130,6 +132,8 @@ if ($SyncRuntime -or $Restart) {
   $runtimeLines = New-Object System.Collections.Generic.List[string]
 
   if ($githubToken) { [void]$runtimeLines.Add("GITHUB_TOKEN=$githubToken") }
+  if ($anthropicKey) { [void]$runtimeLines.Add("ANTHROPIC_API_KEY=$anthropicKey") }
+  if ($azureToken) { [void]$runtimeLines.Add("AZURE_DEVOPS_TOKEN=$azureToken") }
   if ($clientId) { [void]$runtimeLines.Add("GOOGLE_CLIENT_ID=$clientId") }
   if ($clientSecret) { [void]$runtimeLines.Add("GOOGLE_CLIENT_SECRET=$clientSecret") }
   if ($refreshToken) { [void]$runtimeLines.Add("GOOGLE_REFRESH_TOKEN=$refreshToken") }

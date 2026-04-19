@@ -102,6 +102,8 @@ CLIENT_ID="$(read_env GOOGLE_CLIENT_ID)"
 CLIENT_SECRET="$(read_env GOOGLE_CLIENT_SECRET)"
 REFRESH_TOKEN="$(read_env GOOGLE_REFRESH_TOKEN)"
 GITHUB_TOKEN="$(read_env GITHUB_TOKEN)"
+ANTHROPIC_API_KEY="$(read_env ANTHROPIC_API_KEY)"
+AZURE_DEVOPS_TOKEN="$(read_env AZURE_DEVOPS_TOKEN)"
 RUNTIME_VOLUME="$(detect_runtime_volume "$ROOT")"
 
 if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$REFRESH_TOKEN" ]]; then
@@ -163,6 +165,8 @@ if [[ "$SYNC_RUNTIME" -eq 1 ]]; then
   echo "Syncing runtime secrets to volume ${RUNTIME_VOLUME}"
   docker run --rm \
     -e GH_TOKEN="$GITHUB_TOKEN" \
+    -e ANTHROPIC_KEY="$ANTHROPIC_API_KEY" \
+    -e AZURE_TOKEN="$AZURE_DEVOPS_TOKEN" \
     -e GOOG_CLIENT_ID="$CLIENT_ID" \
     -e GOOG_CLIENT_SECRET="$CLIENT_SECRET" \
     -e GOOG_REFRESH_TOKEN="$REFRESH_TOKEN" \
@@ -172,6 +176,8 @@ if [[ "$SYNC_RUNTIME" -eq 1 ]]; then
       umask 077
       {
         if [ -n "$GH_TOKEN" ]; then echo "GITHUB_TOKEN=$GH_TOKEN"; fi
+        if [ -n "$ANTHROPIC_KEY" ]; then echo "ANTHROPIC_API_KEY=$ANTHROPIC_KEY"; fi
+        if [ -n "$AZURE_TOKEN" ]; then echo "AZURE_DEVOPS_TOKEN=$AZURE_TOKEN"; fi
         if [ -n "$GOOG_CLIENT_ID" ]; then echo "GOOGLE_CLIENT_ID=$GOOG_CLIENT_ID"; fi
         if [ -n "$GOOG_CLIENT_SECRET" ]; then echo "GOOGLE_CLIENT_SECRET=$GOOG_CLIENT_SECRET"; fi
         if [ -n "$GOOG_REFRESH_TOKEN" ]; then echo "GOOGLE_REFRESH_TOKEN=$GOOG_REFRESH_TOKEN"; fi
