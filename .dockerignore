@@ -1,0 +1,30 @@
+# Version control
+.git
+
+# Secrets — never send to the Docker daemon
+.env
+
+# Editor / AI state
+.claude/
+
+# Documentation
+*.md
+
+# Personality files — runtime config, not build-time
+personalities/
+
+# Host-only tooling (root level)
+Makefile
+setup.sh
+wrappers.yml
+docker-compose.yml
+.gitignore
+.gitattributes
+
+# Host-only scripts — only the files actually COPYed by the Dockerfiles are needed
+scripts/*.ps1
+scripts/inject-tokens.sh
+scripts/token-health.sh
+scripts/preflight.sh
+scripts/runtime-volume.sh
+scripts/refresh-google-token.sh

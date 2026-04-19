@@ -41,7 +41,7 @@ Tick each off as fixed.
     dot-source it from both scripts.
   - Files: `scripts/token-health.ps1`, `scripts/refresh-google-token.ps1`
 
-- [ ] **M3** No `.dockerignore` — full context (including `.git/`) sent on every build
+- [x] **M3** No `.dockerignore` — full context (including `.git/`) sent on every build
   - Fix: add `.dockerignore` at repo root excluding `.git`, `.env`, `*.md`, `personalities/`, etc.
 
 - [ ] **M5** `inject-tokens.ps1` error says "run ./setup.sh" — bash-only on Windows
