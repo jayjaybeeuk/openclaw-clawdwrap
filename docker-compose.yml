@@ -7,30 +7,28 @@ services:
       args:
         OPENCLAW_NPM_SPEC: ${OPENCLAW_NPM_SPEC:-openclaw@latest}
     environment:
-      HOME: /home/node
-      TERM: xterm-256color
-      # Make exec prefer bash (helps avoid pipefail errors)
-      SHELL: /bin/bash
-
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18789}
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-      OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS: ${OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS:-}
-      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-}
-      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-}
-      GIT_COMMITTER_NAME: ${GIT_COMMITTER_NAME:-}
-      GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-}
-
-      # Convenience: where OpenClaw skills/scripts can reach PinchTab
-      PINCHTAB_URL: http://pinchtab:9867
-      PINCHTAB_TOKEN: ${PINCHTAB_TOKEN}
-
+      - HOME=/home/node
+      - TERM=xterm-256color
+      - SHELL=/bin/bash
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - OPENCLAW_GATEWAY_PORT=${OPENCLAW_GATEWAY_PORT:-18789}
+      - CLAUDE_AI_SESSION_KEY=${CLAUDE_AI_SESSION_KEY}
+      - CLAUDE_WEB_SESSION_KEY=${CLAUDE_WEB_SESSION_KEY}
+      - CLAUDE_WEB_COOKIE=${CLAUDE_WEB_COOKIE}
+      - OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS=${OPENCLAW_CONTROL_UI_ALLOWED_ORIGINS:-}
+      # Passthrough — only forwarded to the container when set in .env.
+      # Absent vars are not injected, so git falls back to ~/.gitconfig
+      # rather than failing with an "empty ident" error.
+      - GIT_AUTHOR_NAME
+      - GIT_AUTHOR_EMAIL
+      - GIT_COMMITTER_NAME
+      - GIT_COMMITTER_EMAIL
+      - PINCHTAB_URL=http://pinchtab:9867
+      - PINCHTAB_TOKEN=${PINCHTAB_TOKEN}
       # LLM auth — set LLM_AUTH_MODE=oauth to use `make login` instead of API keys.
-      LLM_AUTH_MODE: ${LLM_AUTH_MODE:-api_key}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      - LLM_AUTH_MODE=${LLM_AUTH_MODE:-api_key}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
@@ -58,24 +56,21 @@ services:
         OPENCLAW_NPM_SPEC: ${OPENCLAW_NPM_SPEC:-openclaw@latest}
 
     environment:
-      HOME: /home/node
-      TERM: xterm-256color
-      # Same bash preference for exec in sandbox
-      SHELL: /bin/bash
-
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      BROWSER: echo
-
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-}
-      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-}
-      GIT_COMMITTER_NAME: ${GIT_COMMITTER_NAME:-}
-      GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-}
-
-      PINCHTAB_URL: http://pinchtab:9867
-      PINCHTAB_TOKEN: ${PINCHTAB_TOKEN}
+      - HOME=/home/node
+      - TERM=xterm-256color
+      - SHELL=/bin/bash
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - BROWSER=echo
+      - CLAUDE_AI_SESSION_KEY=${CLAUDE_AI_SESSION_KEY}
+      - CLAUDE_WEB_SESSION_KEY=${CLAUDE_WEB_SESSION_KEY}
+      - CLAUDE_WEB_COOKIE=${CLAUDE_WEB_COOKIE}
+      # Passthrough — only forwarded to the container when set in .env.
+      - GIT_AUTHOR_NAME
+      - GIT_AUTHOR_EMAIL
+      - GIT_COMMITTER_NAME
+      - GIT_COMMITTER_EMAIL
+      - PINCHTAB_URL=http://pinchtab:9867
+      - PINCHTAB_TOKEN=${PINCHTAB_TOKEN}
 
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw

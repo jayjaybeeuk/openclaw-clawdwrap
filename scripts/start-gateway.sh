@@ -24,6 +24,14 @@ if [[ -z "${GH_TOKEN:-}" && -n "${GITHUB_TOKEN:-}" ]]; then
   export GH_TOKEN="${GITHUB_TOKEN}"
 fi
 
+# Unset git identity vars that arrived as empty strings from compose.
+# Git treats an empty GIT_AUTHOR_NAME/EMAIL as authoritative and fails with
+# "empty ident" rather than falling back to ~/.gitconfig or /etc/passwd.
+for _var in GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL; do
+  [[ -z "${!_var:-}" ]] && unset "$_var"
+done
+unset _var
+
 # Ensure gateway runs in local mode (required for browser UI connections).
 # Patch the JSON config directly — `openclaw config set gateway.mode` does not
 # produce a log line and appears to be silently ignored for this key.
